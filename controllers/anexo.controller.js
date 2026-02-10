@@ -133,93 +133,63 @@ exports.generarAnexoInteligente = async (req, res) => {
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    // --- AQUÍ ESTÁ LA MAGIA: EL PROMPT GIGANTE ---
+// --- AQUÍ ESTÁ LA MAGIA: EL PROMPT GIGANTE (VERSIÓN ANTI-UNDEFINED) ---
     const prompt = `
-      Actúa como un experto técnico en licitaciones SENCE y OTIC de Chile. 
-      Tu tarea es extraer TODA la información técnica posible de este texto (proveniente de unas Bases Técnicas o Descriptor de Oficio) para rellenar un Anexo Técnico completo.
-
+      Actúa como un experto técnico en licitaciones SENCE. Tu misión es extraer información técnica para el "Anexo N° 2".
+      
       Texto a analizar:
       "${textoCompleto.substring(0, 70000)}" 
-      
-      Instrucciones Críticas:
-      1. Devuelve SOLO un objeto JSON válido.
-      2. Si un dato no aparece explícitamente, infiérelo del contexto o pon "Según estándar SENCE" o "A definir por el ejecutor", pero NO lo dejes vacío.
-      3. OJO: Para "lista_equipos" y "lista_materiales" DEBES devolver un ARRAY de objetos.
-      4. NO incluyas comentarios fuera del JSON.
-      5. NO uses null ni undefined.
 
-      =========== REGLAS DE ORO PARA "lista_equipos" (Sigue esto al pie de la letra) ===========
-      
-      A. CRITERIO DE INCLUSIÓN:
-         - Incluye todo equipo físico necesario para la ejecución práctica (Soldadoras, Esmeriles, Taladros, Prensas, etc.).
-         - Incluye también "Set de escritorio", "Proyector" y "Notebook/PC" si el texto los menciona.
-         - NO incluyas instrumentos puramente teóricos de medición (Micrómetro, Pie de metro) como 'equipos', salvo que sean máquinas grandes.
+      === REGLAS DE ORO DE FORMATO (ESTRICTO) ===
 
-      B. CRITERIO DE MÓDULOS (Multi-módulo):
-         - Si un equipo se utiliza en varios módulos, en el campo "modulo" DEBES listarlos todos separados por comas (Ej: "Módulo 1, Módulo 3").
-         - NO elijas solo uno si aplica a varios. Si aplica a todo el curso, pon "Transversal".
+      1. SEPARACIÓN DE CANTIDAD:
+         - NO mezcles el número con la palabra "unidad" en el mismo campo.
+         - Usa "cantidad" para el NÚMERO (ej: "20").
+         - Usa "unidad_medida" para el TIPO (ej: "Unidades", "Sets", "Kilos", "Global").
 
-      C. CRITERIO DE PARTICIPANTES (Números, no texto):
-         - En el campo "num_participantes", NUNCA pongas "Uso del facilitador" ni textos descriptivos. DEBE SER UN NÚMERO.
-         - Si el equipo es individual por alumno: pon "1".
-         - Si el equipo es compartido por grupos: pon el tamaño del grupo (Ej: "5").
-         - Si el equipo es ÚNICO para la sala (Ej: Proyector, Pizarra, PC del Profesor, Extintor): pon el TOTAL de alumnos del curso (Ej: "20" o "25").
+      2. CERO "UNDEFINED":
+         - Si un dato no existe, pon "—". NUNCA envíes null o vacíos.
 
-      D. CRITERIO DE CERTIFICACIÓN (SEC):
-         - En el campo "certificacion": Analiza si el equipo es ELÉCTRICO (se enchufa a la corriente o usa carga eléctrica).
-         - Si es ELÉCTRICO (Ej: Soldadora, Taladro, Esmeril, Proyector, Notebook, Alargador): Pon "SEC".
-         - Si es MANUAL o inerte (Ej: Martillo, Alicate, Mesa, Pizarra): Pon "No aplica".
-         - NUNCA dejes este campo vacío.
+      3. DURACIÓN (TABLA 3):
+         - Extrae "horas_totales", "dias" y "meses" como campos independientes.
 
-      E. CRITERIO DE CANTIDAD:
-         - La "cantidad" debe ser coherente con el número de alumnos. Si es individual y son 20 alumnos, pon "20".
-      ========================================================================================
+      4. EPP Y KITS:
+         - Incluye siempre un ítem de "Equipo de seguridad individual" en equipos.
+         - Agrupa herramientas menores en "Kit de herramientas" con cantidad para 5 participantes.
 
-      Estructura JSON requerida (Usa estas claves exactas):
+      ===========================================================
+      ESTRUCTURA JSON REQUERIDA (DEBE SER ESTA EXACTAMENTE):
       {
-        "nombre_curso": "Nombre completo del oficio o curso",
-        "horas_totales": "Duración total en horas",
-        "modalidad": "Presencial, E-learning o Blended",
-        
-        "objetivo_general": "Texto completo del objetivo",
-        "objetivos_especificos": "Lista de objetivos específicos",
-        
-        "contenidos_resumen": "Resumen de los módulos",
-        "numero_participantes": "Cantidad de alumnos (si no sale explícito, pon '20')",
-        
-        "requisitos_ingreso": "Perfil de los postulantes",
-        "perfil_facilitador": "Experiencia y requisitos",
-        
-        "infraestructura_sala": "Descripción de la sala",
-        "infraestructura_taller": "Descripción del taller",
-        "infraestructura_banos": "Requisitos de baños",
-        
+        "nombre_curso": "...",
+        "horas_totales": "...",
+        "dias": "...",
+        "meses": "...",
         "lista_equipos": [
             {
-                "descripcion": "Nombre específico del equipo (Ej: Soldadora Arco Manual)",
-                "modulo": "Ej: 'Módulo 1, Módulo 2' o 'Transversal'",
-                "cantidad": "Número total (Ej: 20)",
-                "num_participantes": "Número (Ej: 1, 5, o 20)",
+                "descripcion": "Nombre del equipo",
+                "modulo": "1, 2",
+                "cantidad": "10",
+                "unidad_medida": "Unidades",
+                "num_participantes": "2",
                 "antiguedad": "Menos de 2 años",
-                "certificacion": "SEC o No aplica"
+                "certificacion": "Cert. SEC"
             }
         ],
-        
-        "equipamiento_seguridad": "EPP necesarios",
-        
         "lista_materiales": [
           {
-            "descripcion": "Material consumible",
-            "unidad": "Kilos, metros, unidades",
-            "cantidad": "Cantidad total",
-            "modulo": "Módulo donde se utiliza",
-            "num_participantes": "Ej: 1"
+            "descripcion": "Nombre del material",
+            "cantidad": "20",
+            "unidad_medida": "Unidades",
+            "modulo": "1",
+            "num_participantes": "1"
           }
         ],
-
-        "materiales_escritorio": "Lápices, cuadernos, carpetas",
-        "metodologia": "Descripción metodología",
-        "mecanismos_evaluacion": "Pruebas, listas de cotejo"
+        "objetivo_general": "...",
+        "contenidos_resumen": "...",
+        "infraestructura_sala": "...",
+        "infraestructura_taller": "...",
+        "metodologia": "...",
+        "mecanismos_evaluacion": "..."
       }
     `;
     const result = await model.generateContent(prompt);
@@ -240,33 +210,54 @@ exports.generarAnexoInteligente = async (req, res) => {
         .json({ error: "La IA respondió pero no en formato JSON válido." });
     }
 
+   
+    // --- BLOQUE DATOS FINALES OPTIMIZADO ---NUEVO
     const datosFinales = {
-      // =====================
-      // DATOS MANUALES
-      // =====================
+      // 1. Esparcimos primero lo que trajo la IA (nombre_curso, objetivo, etc.)
+      ...datosExtraidos,
+
+      // 2. Datos manuales que vienen del frontend (req.body)
       nombre_ejecutor: nombre_organismo,
       rut_ejecutor: rut_organismo,
       telefono_ejecutor: telefono_organismo,
       direccion_ejecutor: direccion_organismo,
       comuna_ejecutor: comuna_organismo,
       region_ejecutor: region_organismo,
-
       entidad_requirente: req.body.entidad_requirente || "—",
-
-      // =====================
-      // DATOS CURSO (MANUAL O IA)
-      // =====================
       codigo_curso: req.body.codigo_curso || "—",
+
+      // 3. Aseguramos los campos de la Tabla 3 (Duración)
+      // Si el Word usa {horas}, lo mapeamos desde horas_totales
       horas: datosExtraidos.horas_totales || "—",
+      dias: datosExtraidos.dias || "—",
+      meses: datosExtraidos.meses || "—",
 
-      // =====================
-      // DATOS IA
-      // =====================
-      contenidos: datosExtraidos.contenidos_resumen,
-      objetivo_general: datosExtraidos.objetivo_general,
+      // 4. Limpieza de Materiales (Tabla 8) - AQUÍ SE CORRIGE EL "UNIDAD 10"
+      lista_materiales: (datosExtraidos.lista_materiales || []).map(m => ({
+        descripcion: m.descripcion || "—",
+        modulo: m.modulo || "—",
+        num_participantes: m.num_participantes || "1",
+        // Combinamos cantidad y unidad en un solo campo limpio
+        // Esto evita que si en el Word escribiste "Unidad:", se duplique.
+        cantidad: `${m.cantidad || "1"} ${m.unidad_medida || "Unidad"}`.trim()
+      })),
 
-      // IA
-      ...datosExtraidos,
+      // 5. Limpieza de Equipos (Tabla 7)
+      lista_equipos: (datosExtraidos.lista_equipos || []).map(e => ({
+        descripcion: e.descripcion || "—",
+        modulo: e.modulo || "—",
+        num_participantes: e.num_participantes || "20",
+        antiguedad: e.antiguedad || "Menos de 2 años",
+        certificacion: e.certificacion || "No aplica",
+        // Combinamos cantidad y unidad igual que en materiales
+        cantidad: `${e.cantidad || "1"} ${e.unidad_medida || "Unidad"}`.trim()
+      })),
+
+      // 6. Campos de texto largo (asegurar que no sean undefined)
+      contenidos: datosExtraidos.contenidos_resumen || "—",
+      objetivo_general: datosExtraidos.objetivo_general || "—",
+      metodologia: datosExtraidos.metodologia || "—",
+      mecanismos_evaluacion: datosExtraidos.mecanismos_evaluacion || "—"
     };
     console.log("✅ Datos extraídos (Ejemplo):", datosExtraidos.nombre_curso);
     
@@ -302,8 +293,15 @@ exports.generarAnexoInteligente = async (req, res) => {
 
     // Configuración para que los saltos de línea en el JSON se vean en el Word
     const doc = new Docxtemplater(zip, {
-      paragraphLoop: true,
-      linebreaks: true,
+        paragraphLoop: true,
+        linebreaks: true,
+        // ESTO ELIMINA LOS "UNDEFINED" DE TODO EL DOCUMENTO
+        nullGetter(part) {
+            if (!part.value) {
+                return ""; // O puedes dejarlo vacío ""
+            }
+            return part.value;
+        }
     });
 
     doc.render(datosFinales);
