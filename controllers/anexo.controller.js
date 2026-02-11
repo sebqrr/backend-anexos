@@ -276,7 +276,8 @@ exports.generarAnexoInteligente = async (req, res) => {
         res.setHeader("X-Anexo-Guardado", "false"); 
     }
     
-    res.setHeader("Access-Control-Expose-Headers", "X-Anexo-Guardado");
+    // 👇 AQUÍ ESTÁ EL CAMBIO QUE SOLUCIONA EL ERROR DEL FRONTEND 👇
+    res.setHeader("Access-Control-Expose-Headers", "X-Anexo-Guardado, Content-Disposition");
   
 
     // C. RELLENAR WORD
