@@ -135,63 +135,102 @@ exports.generarAnexoInteligente = async (req, res) => {
 
 // --- AQUÍ ESTÁ LA MAGIA: EL PROMPT GIGANTE (VERSIÓN ANTI-UNDEFINED) ---
     const prompt = `
-      Actúa como un experto técnico en licitaciones SENCE. Tu misión es extraer información técnica para el "Anexo N° 2".
-      
+    Actúa como un experto técnico en licitaciones SENCE.
+    Tu misión es extraer información técnica completa y coherente para el "Anexo N° 2".
+
       Texto a analizar:
-      "${textoCompleto.substring(0, 70000)}" 
+      "${textoCompleto.substring(0, 70000)}"
 
-      === REGLAS DE ORO DE FORMATO (ESTRICTO) ===
+    ================ REGLAS OBLIGATORIAS =================
 
-      1. SEPARACIÓN DE CANTIDAD:
-         - NO mezcles el número con la palabra "unidad" en el mismo campo.
-         - Usa "cantidad" para el NÚMERO (ej: "20").
-         - Usa "unidad_medida" para el TIPO (ej: "Unidades", "Sets", "Kilos", "Global").
+    1. NINGUNA FILA INCOMPLETA (CRÍTICO):
+      - Cada objeto dentro de "lista_equipos" y "lista_materiales" DEBE tener TODOS sus campos completos.
+      - No se permiten valores como:
+          "— —"
+          "-"
+          ""
+      - Si no hay información explícita, debes inferir un valor técnico coherente.
+      - NUNCA dejes campos vacíos.
 
-      2. CERO "UNDEFINED":
-         - Si un dato no existe, pon "—". NUNCA envíes null o vacíos.
+    2. FORMATO DE EQUIPOS (TABLA 7):
+      - "cantidad" = solo número.
+      - "unidad_medida" = solo tipo (Unidades, Sets, Global, etc.).
+      - "num_participantes" debe ser coherente:
+          Ejemplo:
+            Si hay 15 computadores → num_participantes = "1"
+            Si hay 1 proyector para 15 personas → num_participantes = "15"
+      - "antiguedad" nunca puede ir vacía → usar "Menos de 2 años".
+      - "certificacion":
+            - Equipos eléctricos → "Cert. SEC"
+            - Otros → "No aplica"
 
-      3. DURACIÓN (TABLA 3):
-         - Extrae "horas_totales", "dias" y "meses" como campos independientes.
+    3. ÍTEMS OBLIGATORIOS EN EQUIPOS:
+      Siempre deben existir:
+      - "Equipo de seguridad individual"
+      - "Kit de herramientas"
 
-      4. EPP Y KITS:
-         - Incluye siempre un ítem de "Equipo de seguridad individual" en equipos.
-         - Agrupa herramientas menores en "Kit de herramientas" con cantidad para 5 participantes.
+      Para estos:
+      - cantidad: "15"
+      - unidad_medida: "Unidades"
+      - num_participantes: "1"
+      - antiguedad: "Menos de 2 años"
+      - certificacion: "No aplica"
 
-      ===========================================================
-      ESTRUCTURA JSON REQUERIDA (DEBE SER ESTA EXACTAMENTE):
-      {
-        "nombre_curso": "...",
-        "horas_totales": "...",
-        "dias": "...",
-        "meses": "...",
-        "lista_equipos": [
-            {
-                "descripcion": "Nombre del equipo",
-                "modulo": "1, 2",
-                "cantidad": "10",
-                "unidad_medida": "Unidades",
-                "num_participantes": "2",
-                "antiguedad": "Menos de 2 años",
-                "certificacion": "Cert. SEC"
-            }
-        ],
-        "lista_materiales": [
-          {
-            "descripcion": "Nombre del material",
-            "cantidad": "20",
-            "unidad_medida": "Unidades",
-            "modulo": "1",
-            "num_participantes": "1"
-          }
-        ],
-        "objetivo_general": "...",
-        "contenidos_resumen": "...",
-        "infraestructura_sala": "...",
-        "infraestructura_taller": "...",
-        "metodologia": "...",
-        "mecanismos_evaluacion": "..."
-      }
+    4. FORMATO DE MATERIALES (TABLA 8):
+      - "cantidad" debe venir combinado:
+          Ej: "15 Unidades", "1 Set"
+      - NUNCA solo número.
+      - "num_participantes" NUNCA puede ir vacío.
+      - Regla lógica:
+          - Si es material individual → num_participantes = "1"
+          - Si es material compartido → num_participantes = "15"
+
+    5. CERO NULL:
+      - Nunca enviar null.
+      - Nunca enviar undefined.
+      - Nunca enviar campos vacíos.
+      - Si no existe información → inferir valor razonable.
+
+    6. DURACIÓN:
+      - Extraer "horas_totales", "dias" y "meses".
+
+    ======================================================
+    ESTRUCTURA JSON EXACTA:
+
+    {
+      "nombre_curso": "...",
+      "horas_totales": "...",
+      "dias": "...",
+      "meses": "...",
+      "lista_equipos": [
+        {
+          "descripcion": "...",
+          "modulo": "1, 2, 3, 4, 5",
+          "cantidad": "15",
+          "unidad_medida": "Unidades",
+          "num_participantes": "1",
+          "antiguedad": "Menos de 2 años",
+          "certificacion": "Cert. SEC"
+        }
+      ],
+      "lista_materiales": [
+        {
+          "descripcion": "...",
+          "cantidad": "15 Unidades",
+          "modulo": "1, 2, 3, 4, 5",
+          "num_participantes": "1"
+        }
+      ],
+      "objetivo_general": "...",
+      "contenidos_resumen": "...",
+      "infraestructura_sala": "...",
+      "infraestructura_taller": "...",
+      "metodologia": "...",
+      "mecanismos_evaluacion": "..."
+    }
     `;
+
+
     const result = await model.generateContent(prompt);
     const response = await result.response;
     let textoLimpio = response
@@ -232,15 +271,14 @@ exports.generarAnexoInteligente = async (req, res) => {
       dias: datosExtraidos.dias || "—",
       meses: datosExtraidos.meses || "—",
 
-      // 4. Limpieza de Materiales (Tabla 8) - AQUÍ SE CORRIGE EL "UNIDAD 10"
+      // 4. Limpieza de Materiales (Tabla 8) - CORREGIDO FORMATO SENCE
       lista_materiales: (datosExtraidos.lista_materiales || []).map(m => ({
         descripcion: m.descripcion || "—",
         modulo: m.modulo || "—",
-        num_participantes: m.num_participantes || "1",
-        // Combinamos cantidad y unidad en un solo campo limpio
-        // Esto evita que si en el Word escribiste "Unidad:", se duplique.
-        cantidad: `${m.cantidad || "1"} ${m.unidad_medida || "Unidad"}`.trim()
+        num_participantes: m.num_participantes || "—",
+        cantidad: m.cantidad || "1 Unidades"
       })),
+
 
       // 5. Limpieza de Equipos (Tabla 7)
       lista_equipos: (datosExtraidos.lista_equipos || []).map(e => ({
