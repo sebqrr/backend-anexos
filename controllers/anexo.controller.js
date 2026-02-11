@@ -143,55 +143,76 @@ exports.generarAnexoInteligente = async (req, res) => {
 
     ================ REGLAS OBLIGATORIAS =================
 
-    1. NINGUNA FILA INCOMPLETA (CRÍTICO):
-      - Cada objeto dentro de "lista_equipos" y "lista_materiales" DEBE tener TODOS sus campos completos.
-      - No se permiten valores como:
-          "— —"
-          "-"
-          ""
-      - Si no hay información explícita, debes inferir un valor técnico coherente.
-      - NUNCA dejes campos vacíos.
+    1. DETECCIÓN DE PARTICIPANTES:
+      - Detecta el número total de cupos del curso.
+      - Usa ese número como base para calcular cantidades.
+      - Si no aparece explícitamente, asume 15 participantes.
 
-    2. FORMATO DE EQUIPOS (TABLA 7):
-      - "cantidad" = solo número.
-      - "unidad_medida" = solo tipo (Unidades, Sets, Global, etc.).
+    2. NINGUNA FILA INCOMPLETA:
+      - Cada objeto dentro de "lista_equipos" y "lista_materiales" debe tener TODOS sus campos completos.
+      - No se permiten valores vacíos.
+      - No usar null, undefined o "".
+      - Si falta información explícita, inferir valor técnico coherente.
+
+    3. CONTROL ESTRICTO DE UNIDADES DE MEDIDA (OBLIGATORIO):
+
+      Las únicas unidades permitidas son:
+
+      - "Unidad"
+      - "Unidades"
+      - "Kit"
+      - "Kits"
+      - "Set"
+      - "Sets"
+      - "Global"
+
+      Reglas de uso:
+
+      - Si cantidad = 1 → usar singular (Unidad, Kit, Set).
+      - Si cantidad > 1 → usar plural (Unidades, Kits, Sets).
+      - Si la descripción contiene la palabra "Kit", la unidad debe ser "Kit" o "Kits".
+      - Si la descripción contiene la palabra "Set", la unidad debe ser "Set" o "Sets".
+      - No reemplazar "Kit" por "Set".
+      - No usar sinónimos como: Pack, Paquete, Equipo, etc.
+      - No inventar nuevas unidades.
+      - Respetar concordancia gramatical obligatoria.
+
+    4. REGLAS PARA EQUIPOS (TABLA 7):
+      - "cantidad" debe ser solo número.
+      - "unidad_medida" debe cumplir estrictamente las reglas anteriores.
       - "num_participantes" debe ser coherente:
-          Ejemplo:
-            Si hay 15 computadores → num_participantes = "1"
-            Si hay 1 proyector para 15 personas → num_participantes = "15"
-      - "antiguedad" nunca puede ir vacía → usar "Menos de 2 años".
+            - Si es 1 equipo por participante → 1
+            - Si es compartido por todos → número total de participantes
+      - "antiguedad":
+            - Equipos tecnológicos → "Menos de 2 años"
+            - Insumos o kits → "Menos de 1 año"
+            - Si no aplica → "No aplica"
       - "certificacion":
             - Equipos eléctricos → "Cert. SEC"
             - Otros → "No aplica"
 
-    3. ÍTEMS OBLIGATORIOS EN EQUIPOS:
+    5. ÍTEMS OBLIGATORIOS EN EQUIPOS:
       Siempre deben existir:
-      - "Equipo de seguridad individual"
-      - "Kit de herramientas"
+      - Equipo de seguridad individual
+      - Kit de herramientas
 
-      Para estos:
-      - cantidad: "15"
-      - unidad_medida: "Unidades"
-      - num_participantes: "1"
-      - antiguedad: "Menos de 2 años"
-      - certificacion: "No aplica"
+      Sus cantidades deben calcularse dinámicamente según los cupos detectados.
+      Deben respetar las reglas de unidad y concordancia.
 
-    4. FORMATO DE MATERIALES (TABLA 8):
-      - "cantidad" debe venir combinado:
-          Ej: "15 Unidades", "1 Set"
-      - NUNCA solo número.
-      - "num_participantes" NUNCA puede ir vacío.
-      - Regla lógica:
-          - Si es material individual → num_participantes = "1"
-          - Si es material compartido → num_participantes = "15"
+    6. REGLAS PARA MATERIALES (TABLA 8):
+      - "cantidad" debe venir combinado con unidad.
+            Ejemplos correctos:
+                "15 Unidades"
+                "1 Kit"
+                "15 Kits"
+                "1 Set"
+      - No fijar cantidades.
+      - Calcular según el número de participantes detectado.
+      - "num_participantes" nunca vacío.
+      - Aplicar lógica coherente según uso individual o grupal.
+      - Respetar estrictamente las reglas de unidades y pluralización.
 
-    5. CERO NULL:
-      - Nunca enviar null.
-      - Nunca enviar undefined.
-      - Nunca enviar campos vacíos.
-      - Si no existe información → inferir valor razonable.
-
-    6. DURACIÓN:
+    7. DURACIÓN:
       - Extraer "horas_totales", "dias" y "meses".
 
     ======================================================
@@ -205,20 +226,20 @@ exports.generarAnexoInteligente = async (req, res) => {
       "lista_equipos": [
         {
           "descripcion": "...",
-          "modulo": "1, 2, 3, 4, 5",
-          "cantidad": "15",
-          "unidad_medida": "Unidades",
-          "num_participantes": "1",
-          "antiguedad": "Menos de 2 años",
-          "certificacion": "Cert. SEC"
+          "modulo": "...",
+          "cantidad": "...",
+          "unidad_medida": "...",
+          "num_participantes": "...",
+          "antiguedad": "...",
+          "certificacion": "..."
         }
       ],
       "lista_materiales": [
         {
           "descripcion": "...",
-          "cantidad": "15 Unidades",
-          "modulo": "1, 2, 3, 4, 5",
-          "num_participantes": "1"
+          "cantidad": "...",
+          "modulo": "...",
+          "num_participantes": "..."
         }
       ],
       "objetivo_general": "...",
@@ -229,6 +250,7 @@ exports.generarAnexoInteligente = async (req, res) => {
       "mecanismos_evaluacion": "..."
     }
     `;
+
 
 
     const result = await model.generateContent(prompt);
