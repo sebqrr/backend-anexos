@@ -63,3 +63,59 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: "Error en el servidor", error });
   }
 };
+
+// CAMBIAR CONTRASEÑA (Usuario Logueado)
+exports.changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    
+    const userId = req.user.id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "La contraseña actual es incorrecta" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+
+    await user.save();
+
+    res.json({ message: "Contraseña actualizada exitosamente" });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error al cambiar la contraseña", error });
+  }
+};
+
+// 👇 ESTA ES LA NUEVA FUNCIÓN QUE NECESITAS 👇
+// RESTABLECER CONTRASEÑA (Público - "Olvidé mi contraseña")
+exports.resetPasswordPublic = async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    // 1. Buscar usuario por email
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: "El correo no está registrado" });
+    }
+
+    // 2. Encriptar la nueva contraseña directamente
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+
+    // 3. Guardar cambios
+    await user.save();
+
+    res.json({ message: "Contraseña actualizada correctamente" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error en el servidor", error });
+  }
+};
