@@ -136,7 +136,7 @@ exports.generarAnexoInteligente = async (req, res) => {
 // --- AQUÍ ESTÁ LA MAGIA: EL PROMPT GIGANTE (VERSIÓN ANTI-UNDEFINED) ---
     const prompt = `
     Actúa como un experto técnico en licitaciones SENCE.
-    Tu misión es extraer información técnica completa y coherente para el "Anexo N° 2".
+    Tu misión es generar el "Anexo N° 2" replicando el formato administrativo oficial del ejemplo SENCE.
 
       Texto a analizar:
       "${textoCompleto.substring(0, 70000)}"
@@ -144,77 +144,163 @@ exports.generarAnexoInteligente = async (req, res) => {
     ================ REGLAS OBLIGATORIAS =================
 
     1. DETECCIÓN DE PARTICIPANTES:
-      - Detecta el número total de cupos del curso.
-      - Usa ese número como base para calcular cantidades.
-      - Si no aparece explícitamente, asume 15 participantes.
+      - Detecta el número total de cupos.
+      - Si no aparece explícitamente, asumir 15.
+      - Guardar como TOTAL_PARTICIPANTES.
+      - TODOS los cálculos deben basarse en este número.
 
-    2. NINGUNA FILA INCOMPLETA:
-      - Cada objeto dentro de "lista_equipos" y "lista_materiales" debe tener TODOS sus campos completos.
-      - No se permiten valores vacíos.
+    2. DETECCIÓN DE MÓDULOS:
+      - Detectar números de módulos.
+      - El campo "modulo" solo puede contener números separados por coma.
+        Ejemplo: "1,2,3,4,5"
+      - Prohibido usar texto como "Todos los módulos".
+
+    3. NINGUNA FILA INCOMPLETA:
       - No usar null, undefined o "".
-      - Si falta información explícita, inferir valor técnico coherente.
+      - Todos los campos deben tener valor.
 
-    3. CONTROL ESTRICTO DE UNIDADES DE MEDIDA (OBLIGATORIO):
+    4. CONTROL ESTRICTO DE UNIDADES:
 
-      Las únicas unidades permitidas son:
+    Unidades permitidas:
+    - Unidad
+    - Unidades
+    - Kit
+    - Kits
+    - Set
+    - Sets
+    - Global
 
-      - "Unidad"
-      - "Unidades"
-      - "Kit"
-      - "Kits"
-      - "Set"
-      - "Sets"
-      - "Global"
+    Reglas:
+    - 1 → singular.
+    - >1 → plural.
+    - Solo usar Kit/Sets si aparece explícitamente en el texto.
+    - No inventar unidades.
 
-      Reglas de uso:
+    ------------------------------------------------------
+    5. TABLA 7 – EQUIPOS (FORMATO OFICIAL SENCE)
+    ------------------------------------------------------
 
-      - Si cantidad = 1 → usar singular (Unidad, Kit, Set).
-      - Si cantidad > 1 → usar plural (Unidades, Kits, Sets).
-      - Si la descripción contiene la palabra "Kit", la unidad debe ser "Kit" o "Kits".
-      - Si la descripción contiene la palabra "Set", la unidad debe ser "Set" o "Sets".
-      - No reemplazar "Kit" por "Set".
-      - No usar sinónimos como: Pack, Paquete, Equipo, etc.
-      - No inventar nuevas unidades.
-      - Respetar concordancia gramatical obligatoria.
+    DEFINICIÓN DE COLUMNAS:
 
-    4. REGLAS PARA EQUIPOS (TABLA 7):
-      - "cantidad" debe ser solo número.
-      - "unidad_medida" debe cumplir estrictamente las reglas anteriores.
-      - "num_participantes" debe ser coherente:
-            - Si es 1 equipo por participante → 1
-            - Si es compartido por todos → número total de participantes
-      - "antiguedad":
-            - Equipos tecnológicos → "Menos de 2 años"
-            - Insumos o kits → "Menos de 1 año"
-            - Si no aplica → "No aplica"
-      - "certificacion":
-            - Equipos eléctricos → "Cert. SEC"
-            - Otros → "No aplica"
+    - cantidad = total de equipos disponibles.
+    - num_participantes = personas que usan UN equipo.
 
-    5. ÍTEMS OBLIGATORIOS EN EQUIPOS:
-      Siempre deben existir:
-      - Equipo de seguridad individual
-      - Kit de herramientas
+    CASOS PERMITIDOS:
 
-      Sus cantidades deben calcularse dinámicamente según los cupos detectados.
-      Deben respetar las reglas de unidad y concordancia.
+    A) Equipo individual por participante:
+      - cantidad = TOTAL_PARTICIPANTES
+      - num_participantes = 1
+      - La descripción debe incluir la frase:
+            "por participante"
+      Ejemplo:
+            "1 computador por participante"
 
-    6. REGLAS PARA MATERIALES (TABLA 8):
-      - "cantidad" debe venir combinado con unidad.
-            Ejemplos correctos:
-                "15 Unidades"
-                "1 Kit"
-                "15 Kits"
-                "1 Set"
-      - No fijar cantidades.
-      - Calcular según el número de participantes detectado.
-      - "num_participantes" nunca vacío.
-      - Aplicar lógica coherente según uso individual o grupal.
-      - Respetar estrictamente las reglas de unidades y pluralización.
+    B) Equipo exclusivo del facilitador:
+      - cantidad = 1
+      - num_participantes = 1
+      - Descripción:
+            "Notebook o PC para facilitador"
 
-    7. DURACIÓN:
-      - Extraer "horas_totales", "dias" y "meses".
+    C) Equipo compartido grupal:
+      - cantidad = 1
+      - num_participantes = TOTAL_PARTICIPANTES
+      - Solo nombre del equipo.
 
+    VALIDACIÓN LÓGICA OBLIGATORIA:
+
+    Está PROHIBIDO que:
+      cantidad > 1
+      Y
+      num_participantes > 1
+
+    Si ocurre, corregir automáticamente.
+
+    ------------------------------------------------------
+    CERTIFICACIÓN (SEGÚN PATRÓN OFICIAL ANEXO 2)
+    ------------------------------------------------------
+
+    Para equipos tecnológicos eléctricos:
+    - Notebook
+    - PC
+    - Computador
+    - Proyector multimedia
+
+    Usar:
+      "Cert. SEC"
+
+    Para equipos no eléctricos:
+    - Telón
+    - Pizarrón
+    - Filmadora
+    - Cámara fotográfica
+
+    Usar:
+      "No aplica"
+
+    No depender exclusivamente de que el texto lo indique.
+    Seguir el patrón administrativo del Anexo 2 oficial.
+
+    ------------------------------------------------------
+    ANTIGÜEDAD
+    ------------------------------------------------------
+
+    - Equipos tecnológicos → "Menos de 2 años"
+    - Equipos físicos → "Menos de 2 años"
+    - Insumos → "No aplica"
+
+    ------------------------------------------------------
+    6. TABLA 8 – MATERIALES (FORMATO OFICIAL)
+    ------------------------------------------------------
+
+    DEFINICIÓN:
+
+    - cantidad = total de unidades disponibles.
+    - num_participantes = personas que usan UNA unidad.
+
+    CASOS:
+
+    A) Material individual:
+      - cantidad = TOTAL_PARTICIPANTES
+      - num_participantes = 1
+
+    B) Material grupal:
+      - cantidad = 1
+      - num_participantes = TOTAL_PARTICIPANTES
+
+    C) Material del facilitador:
+      - cantidad = 1
+      - num_participantes = 1
+
+    VALIDACIÓN:
+
+    Está PROHIBIDO:
+      cantidad > 1
+      Y
+      num_participantes > 1
+
+    Si ocurre, corregir automáticamente.
+
+    FORMATO:
+
+    - "cantidad" debe incluir número + unidad.
+    Ejemplos:
+      "15 Unidades"
+      "1 Unidad"
+      "15 Sets"
+
+    ------------------------------------------------------
+    7. DURACIÓN
+    ------------------------------------------------------
+
+    Extraer:
+    - horas_totales
+    - dias
+    - meses
+    Solo colocar el numero correspondiente en la unidad correcta, no colocar en cada campo la cantidad correspondiente. Ejemplo:
+    Si el texto dice "Duración total: 40 horas", entonces:
+    horas_totales = 40
+    dias = "—"
+    meses = "—"
     ======================================================
     ESTRUCTURA JSON EXACTA:
 
