@@ -137,157 +137,130 @@ exports.generarAnexoInteligente = async (req, res) => {
 // --- AQUÍ ESTÁ LA MAGIA: EL PROMPT GIGANTE (VERSIÓN ANTI-UNDEFINED) ---
     const prompt = `
     Actúa como un experto técnico en licitaciones SENCE.
-    Tu misión es generar el "Anexo N° 2" replicando el formato administrativo oficial del ejemplo SENCE.
+    Tu misión es generar el "Anexo N° 2" replicando EXACTAMENTE el formato administrativo oficial SENCE.
 
       Texto a analizar:
       "${textoCompleto.substring(0, 70000)}"
 
     ================ REGLAS OBLIGATORIAS =================
 
-    1. DETECCIÓN DE PARTICIPANTES:
-      - Detecta el número total de cupos.
-      - Si no aparece explícitamente, asumir 15.
-      - Guardar como TOTAL_PARTICIPANTES.
-      - TODOS los cálculos deben basarse en este número.
+    1. DETECCIÓN DE PARTICIPANTES
+    - Detectar número total de cupos.
+    - Si no aparece, asumir segun el texto indique la cantidad de participantes o el número de equipos segun corresponda.
+    - Guardar como TOTAL_PARTICIPANTES o usarlo cuando sea necesario en caso de que se pida y este claro en el PDF.
+    - Solo los calculos necesarios deben basarse en este número, si el PDF es claro al respecto. No asumir números arbitrarios.
+    - Si el PDF no es claro, volver a revisar el texto para detectar pistas sobre la cantidad de participantes o equipos, y usar ese número como referencia para corregir cualquier inconsistencia en las tablas.
+    - No inventar números de participantes ni de equipos. Usar solo lo que el PDF indique o lo que se pueda inferir claramente del texto.
+    - Colocar las unidades de medida de cada equipo o material segun corresponda, y asegurarse que coincidan con singular/plural segun el número detectado y el texto o numero del PDF.
 
-    2. DETECCIÓN DE MÓDULOS:
-      - Detectar números de módulos.
-      - El campo "modulo" solo puede contener números separados por coma.
-        Ejemplo: "1,2,3,4,5"
-      - Prohibido usar texto como "Todos los módulos".
 
-    3. NINGUNA FILA INCOMPLETA:
-      - No usar null, undefined o "".
-      - Todos los campos deben tener valor.
+    2. DETECCIÓN DE MÓDULOS
+    - Detectar números de módulos.
+    - El campo "modulo" solo puede contener números separados por coma.
+      Ejemplo: "1,2,3,4,5"
+    - Prohibido usar texto como "Todos los módulos".
 
-    4. CONTROL ESTRICTO DE UNIDADES:
+    3. PROHIBIDO VALORES VACÍOS
+    - No usar null, undefined o "".
+    - Si no existe información usar "—".
 
-    Unidades permitidas:
-    - Unidad
-    - Unidades
-    - Kit
-    - Kits
-    - Set
-    - Sets
+    4. UNIDADES PERMITIDAS
+    Solo usar:
+    - Unidad / Unidades
+    - Kit / Kits
+    - Set / Sets
     - Global
+    
 
     Reglas:
-    - 1 → singular.
-    - >1 → plural.
-    - Solo usar Kit/Sets si aparece explícitamente en el texto.
+    - 1 → singular
+    - >1 → plural
     - No inventar unidades.
 
     ------------------------------------------------------
-    5. TABLA 7 – EQUIPOS (FORMATO OFICIAL SENCE)
+    5. TABLA 7 – EQUIPOS (REGLA MATEMÁTICA OBLIGATORIA)
     ------------------------------------------------------
 
-    DEFINICIÓN DE COLUMNAS:
-
+    DEFINICIONES:
     - cantidad = total de equipos disponibles.
-    - num_participantes = personas que usan UN equipo.
+    - num_participantes = personas que utilizan un mismo equipo.
+    - TOTAL_PARTICIPANTES = cupos detectados.
 
-    CASOS PERMITIDOS:
+    REGLA OBLIGATORIA: debe cumplirse UNA de estas ecuaciones:
 
-    A) Equipo individual por participante:
-      - cantidad = TOTAL_PARTICIPANTES
-      - num_participantes = 1
-      - La descripción debe incluir la frase:
-            "por participante"
-      Ejemplo:
-            "1 computador por participante"
+    1) Equipo individual por participante
+      cantidad = TOTAL_PARTICIPANTES
+      num_participantes = 1
+      La descripción debe incluir "por participante".
 
-    B) Equipo exclusivo del facilitador:
-      - cantidad = 1
-      - num_participantes = 1
-      - Descripción:
-            "Notebook o PC para facilitador"
+    2) Equipo del facilitador
+      cantidad = 1
+      num_participantes = TOTAL_PARTICIPANTES
 
-    C) Equipo compartido grupal:
-      - cantidad = 1
-      - num_participantes = TOTAL_PARTICIPANTES
-      - Solo nombre del equipo.
+    3) Equipo grupal compartido
+      cantidad = 1
+      num_participantes = TOTAL_PARTICIPANTES
 
-    VALIDACIÓN LÓGICA OBLIGATORIA:
+    PROHIBIDO:
+    - cantidad > 1 Y num_participantes > 1
+    - cantidad ≠ TOTAL_PARTICIPANTES si dice "por participante"
+    - num_participantes = 1 si cantidad = 1 y no dice "por participante"
 
-    Está PROHIBIDO que:
-      cantidad > 1
-      Y
-      num_participantes > 1
-
-    Si ocurre, corregir automáticamente.
+    REGLA DE PRIORIDAD SI EL PDF NO ES CLARO:
+    - Computador → tipo 1
+    - Notebook facilitador → tipo 2
+    - Proyector / Telón / Pizarrón / Cámara → tipo 3
 
     ------------------------------------------------------
-    CERTIFICACIÓN (SEGÚN PATRÓN OFICIAL ANEXO 2)
+    CERTIFICACIÓN
     ------------------------------------------------------
 
-    Para equipos tecnológicos eléctricos:
-    - Notebook
-    - PC
-    - Computador
-    - Proyector multimedia
+    - Notebook / PC / Computador / Proyector → "Cert. SEC"
+    - Telón / Pizarrón / Cámara / Filmadora → "No aplica"
 
-    Usar:
-      "Cert. SEC"
-
-    Para equipos no eléctricos:
-    - Telón
-    - Pizarrón
-    - Filmadora
-    - Cámara fotográfica
-
-    Usar:
-      "No aplica"
-
-    No depender exclusivamente de que el texto lo indique.
-    Seguir el patrón administrativo del Anexo 2 oficial.
+    No depender del texto del PDF.
+    Seguir patrón administrativo oficial.
 
     ------------------------------------------------------
     ANTIGÜEDAD
     ------------------------------------------------------
 
-    - Equipos tecnológicos → "Menos de 2 años"
-    - Equipos físicos → "Menos de 2 años"
-    - Insumos → "No aplica"
+    - Equipos tecnológicos → "Menos de 2 años" o segun el texto si es claro.
+    - Equipos físicos → "Menos de 2 años" o segun el texto si es claro.
+    - Insumos → "No aplica" o segun el texto si es claro.
 
     ------------------------------------------------------
-    6. TABLA 8 – MATERIALES (FORMATO OFICIAL)
+    6. TABLA 8 – MATERIALES (REGLA MATEMÁTICA OBLIGATORIA)
     ------------------------------------------------------
 
-    DEFINICIÓN:
-
+    DEFINICIONES:
     - cantidad = total de unidades disponibles.
     - num_participantes = personas que usan UNA unidad.
 
-    CASOS:
+    REGLAS:
 
-    A) Material individual:
-      - cantidad = TOTAL_PARTICIPANTES
-      - num_participantes = 1
+    1) Material individual
+      cantidad = TOTAL_PARTICIPANTES
+      num_participantes = 1
 
-    B) Material grupal:
-      - cantidad = 1
-      - num_participantes = TOTAL_PARTICIPANTES
+    2) Material grupal
+      cantidad = 1
+      num_participantes = TOTAL_PARTICIPANTES
 
-    C) Material del facilitador:
-      - cantidad = 1
-      - num_participantes = 1
+    3) Libro de clases
+      cantidad = 1
+      num_participantes = TOTAL_PARTICIPANTES
 
-    VALIDACIÓN:
+    4) Plumones para pizarrón
+      cantidad = 1 Set
+      num_participantes = TOTAL_PARTICIPANTES
 
-    Está PROHIBIDO:
-      cantidad > 1
-      Y
-      num_participantes > 1
+    PROHIBIDO:
+    - cantidad > 1 Y num_participantes > 1
+    - Libro de clases con num_participantes = 1
+    - Plumones con num_participantes = 1
 
-    Si ocurre, corregir automáticamente.
-
-    FORMATO:
-
-    - "cantidad" debe incluir número + unidad.
-    Ejemplos:
-      "15 Unidades"
-      "1 Unidad"
-      "15 Sets"
+    Si alguna regla se incumple, corregir automáticamente usando el texto o los números correspondientes del PDF como referencia.
 
     ------------------------------------------------------
     7. DURACIÓN
@@ -297,13 +270,28 @@ exports.generarAnexoInteligente = async (req, res) => {
     - horas_totales
     - dias
     - meses
-    Solo colocar el numero correspondiente en la unidad correcta, no colocar en cada campo la cantidad correspondiente. Ejemplo:
-    Si el texto dice "Duración total: 40 horas", entonces:
+
+    Si solo existe uno, los demás deben ser "—".
+
+    Ejemplo:
+    Si dice "Duración total: 40 horas":
     horas_totales = 40
     dias = "—"
     meses = "—"
+
     ======================================================
-    ESTRUCTURA JSON EXACTA:
+    VALIDACIÓN FINAL OBLIGATORIA
+    ======================================================
+
+    Antes de responder:
+    - Verificar que ninguna fila viole las reglas matemáticas.
+    - Verificar que no existan valores vacíos.
+    - Verificar coherencia entre cantidad, num_participantes y el texto.
+    - Verificar que las unidades coincidan con singular/plural segun el número.
+
+    ======================================================
+    ESTRUCTURA JSON EXACTA
+    ======================================================
 
     {
       "nombre_curso": "...",
@@ -336,7 +324,10 @@ exports.generarAnexoInteligente = async (req, res) => {
       "metodologia": "...",
       "mecanismos_evaluacion": "..."
     }
+
+    Responder SOLO con el JSON válido.
     `;
+
 
 
 
@@ -380,27 +371,9 @@ exports.generarAnexoInteligente = async (req, res) => {
       dias: datosExtraidos.dias || "—",
       meses: datosExtraidos.meses || "—",
 
-      // 4. Limpieza de Materiales (Tabla 8) - CORREGIDO FORMATO SENCE
-      lista_materiales: (datosExtraidos.lista_materiales || []).map(m => ({
-        descripcion: m.descripcion || "—",
-        modulo: m.modulo || "—",
-        num_participantes: m.num_participantes || "—",
-        cantidad: m.cantidad || "1 Unidades"
-      })),
 
 
-      // 5. Limpieza de Equipos (Tabla 7)
-      lista_equipos: (datosExtraidos.lista_equipos || []).map(e => ({
-        descripcion: e.descripcion || "—",
-        modulo: e.modulo || "—",
-        num_participantes: e.num_participantes || "20",
-        antiguedad: e.antiguedad || "Menos de 2 años",
-        certificacion: e.certificacion || "No aplica",
-        // Combinamos cantidad y unidad igual que en materiales
-        cantidad: `${e.cantidad || "1"} ${e.unidad_medida || "Unidad"}`.trim()
-      })),
-
-      // 6. Campos de texto largo (asegurar que no sean undefined)
+      // 4. Campos de texto largo (asegurar que no sean undefined)
       contenidos: datosExtraidos.contenidos_resumen || "—",
       objetivo_general: datosExtraidos.objetivo_general || "—",
       metodologia: datosExtraidos.metodologia || "—",
