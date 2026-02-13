@@ -315,6 +315,7 @@ exports.generarAnexoInteligente = async (req, res) => {
           "cantidad": "...",
           "modulo": "...",
           "num_participantes": "..."
+          "unidad_medida": "...",
         }
       ],
       "objetivo_general": "...",
