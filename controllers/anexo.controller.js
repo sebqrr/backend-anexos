@@ -80,6 +80,7 @@ exports.generarAnexo = async (req, res) => {
     await new Anexo({
       nombrePlantilla: templateName,
       datosRellenados: datos,
+      usuarioId: req.user.id, //nuevo campo para relacionar con el usuario
     }).save();
 
     res.setHeader(
@@ -412,7 +413,8 @@ exports.generarAnexoInteligente = async (req, res) => {
         await new Anexo({
             nombrePlantilla: "plantilla_anexo2.docx",
             datosRellenados: datosFinales,
-            fechaGeneracion: new Date()
+            fechaGeneracion: new Date(),
+            usuarioId: req.user.id, //nuevo campo para relacionar con el usuario
         }).save();
         
         console.log("✅ GUARDADO EXITOSO EN BD");
@@ -476,7 +478,7 @@ exports.generarAnexoInteligente = async (req, res) => {
 // 4. Get a todos los anexos
 exports.obtenerAnexos = async (req, res) => {
   try {
-    const anexos = await Anexo.find().sort({ createdAt: -1 });
+    const anexos = await Anexo.find({ usuarioId: req.user.id }).sort({ createdAt: -1 });
     res.status(200).json(anexos);
   } catch (error) {
     console.error("❌ Error obteniendo anexos:", error);
@@ -489,7 +491,10 @@ exports.obtenerAnexoPorId = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const anexo = await Anexo.findById(id);
+    const anexo = await Anexo.findOne({
+      _id: id,
+      usuarioId: req.user.id,
+    });
 
     if (!anexo) {
       return res.status(404).json({ error: "Anexo no encontrado" });
@@ -507,9 +512,11 @@ exports.actualizarAnexo = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const anexoActualizado = await Anexo.findByIdAndUpdate(id, req.body, {
-      new: true,
-    });
+    const anexoActualizado = await Anexo.findOneAndUpdate(
+      { _id: id, usuarioId: req.user.id },
+      req.body,
+      { new: true }
+    );
 
     if (!anexoActualizado) {
       return res.status(404).json({ error: "Anexo no encontrado" });
@@ -530,7 +537,10 @@ exports.eliminarAnexo = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const anexoEliminado = await Anexo.findByIdAndDelete(id);
+    const anexoEliminado = await Anexo.findOneAndDelete({
+      _id: id,
+      usuarioId: req.user.id,
+    });
 
     if (!anexoEliminado) {
       return res.status(404).json({ error: "Anexo no encontrado" });

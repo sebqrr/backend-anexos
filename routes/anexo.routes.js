@@ -1,29 +1,35 @@
 const express = require("express");
 const router = express.Router();
 const anexoController = require("../controllers/anexo.controller");
+const auth = require("../middleware/auth.middleware");
 
-
-// Subir plantilla
+// 🔐 Subir plantilla (protegido)
 router.post(
   "/subir",
+  auth,
   anexoController.upload.single("file"),
-  anexoController.subirPlantilla,
+  anexoController.subirPlantilla
 );
 
-// Generar documento rellenando datos manualmente 
-router.post("/generar", anexoController.generarAnexo);
+// 🔐 Generar documento manual
+router.post(
+  "/generar",
+  auth,
+  anexoController.generarAnexo
+);
 
-// Subir PDF técnico y que la IA lo procese inteligentemente
+// 🔐 Generación inteligente con IA
 router.post(
   "/inteligente",
-  anexoController.uploadTecnico, 
-  anexoController.generarAnexoInteligente, 
+  auth,
+  anexoController.uploadTecnico,
+  anexoController.generarAnexoInteligente
 );
-// CRUD Básico de Anexos
-router.get("/", anexoController.obtenerAnexos);
-router.get("/:id", anexoController.obtenerAnexoPorId);
-router.patch("/:id", anexoController.actualizarAnexo);
-router.delete("/:id", anexoController.eliminarAnexo);
 
+// 🔐 CRUD Básico de Anexos
+router.get("/", auth, anexoController.obtenerAnexos);
+router.get("/:id", auth, anexoController.obtenerAnexoPorId);
+router.patch("/:id", auth, anexoController.actualizarAnexo);
+router.delete("/:id", auth, anexoController.eliminarAnexo);
 
 module.exports = router;
