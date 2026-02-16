@@ -134,200 +134,134 @@ exports.generarAnexoInteligente = async (req, res) => {
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-// --- AQUÍ ESTÁ LA MAGIA: EL PROMPT GIGANTE (VERSIÓN ANTI-UNDEFINED) ---
+    // --- AQUÍ ESTÁ EL PROMPT AJUSTADO PARA PLURALES ---
     const prompt = `
-    Actúa como un experto técnico en licitaciones SENCE.
-    Tu misión es generar el "Anexo N° 2" replicando EXACTAMENTE el formato administrativo oficial SENCE.
+Actúa como un experto técnico en licitaciones SENCE.
+Tu misión es generar el "Anexo N° 2" replicando EXACTAMENTE el formato administrativo oficial SENCE.
 
-      Texto a analizar:
-      "${textoCompleto.substring(0, 70000)}"
+Texto a analizar:
+"${textoCompleto.substring(0, 70000)}"
 
-    ================ REGLAS OBLIGATORIAS =================
+================ REGLAS OBLIGATORIAS =================
 
-    1. DETECCIÓN DE PARTICIPANTES
-    - Detectar número total de cupos.
-    - Si no aparece, asumir segun el texto indique la cantidad de participantes o el número de equipos segun corresponda.
-    - Guardar como TOTAL_PARTICIPANTES o usarlo cuando sea necesario en caso de que se pida y este claro en el PDF.
-    - Solo los calculos necesarios deben basarse en este número, si el PDF es claro al respecto. No asumir números arbitrarios.
-    - Si el PDF no es claro, volver a revisar el texto para detectar pistas sobre la cantidad de participantes o equipos, y usar ese número como referencia para corregir cualquier inconsistencia en las tablas.
-    - No inventar números de participantes ni de equipos. Usar solo lo que el PDF indique o lo que se pueda inferir claramente del texto.
-    - Colocar las unidades de medida de cada equipo o material segun corresponda, y asegurarse que coincidan con singular/plural segun el número detectado y el texto o numero del PDF.
+1. DETECCIÓN DE PARTICIPANTES
+- Detectar número total de cupos (TOTAL_PARTICIPANTES).
+- Si no aparece explícitamente, buscar pistas (ej: "25 alumnos").
+- Si no hay información, asumir estándar SENCE: 25.
+- Usar este número para los cálculos matemáticos.
 
+2. DETECCIÓN DE MÓDULOS
+- El campo "modulo" solo puede contener números separados por coma (Ej: "1,2,3").
+- Prohibido texto.
 
-    2. DETECCIÓN DE MÓDULOS
-    - Detectar números de módulos.
-    - El campo "modulo" solo puede contener números separados por coma.
-      Ejemplo: "1,2,3,4,5"
-    - Prohibido usar texto como "Todos los módulos".
+3. PROHIBIDO VALORES VACÍOS
+- No usar null, undefined o "". Usar "—" si no aplica.
 
-    3. PROHIBIDO VALORES VACÍOS
-    - No usar null, undefined o "".
-    - Si no existe información usar "—".
+------------------------------------------------------
+4. REGLAS DE FORMATO (CANTIDAD Y UNIDAD) - ¡CRÍTICO!
+------------------------------------------------------
+Debes separar estrictamente el número del texto y APLICAR PLURALES CORRECTAMENTE.
 
-    4. UNIDADES PERMITIDAS
-    Usar las unidades que correspondan segun el texto del PDF, analizardo cuidadosamente cada equipo o material, y asignar la unidad correcta segun el contexto. Las unidades deben ser coherentes con el número detectado y el texto del PDF.
+A) CAMPO "cantidad":
+   - DEBE ser SOLO NÚMEROS (String numérico).
+   - Ejemplo: "25", "1", "10".
+   - PROHIBIDO poner texto aquí.
 
-    
+B) CAMPO "unidad_medida":
+   - DEBE coincidir gramaticalmente con la cantidad.
+   - Si cantidad = "1" -> Usar SINGULAR (ej: "Unidad", "Set", "Caja", "Resma").
+   - Si cantidad > "1" -> Usar PLURAL (ej: "Unidades", "Sets", "Cajas", "Resmas").
+   
+   Ejemplos correctos:
+   - "25 Unidades" (Separado en json: cantidad="25", unidad_medida="Unidades")
+   - "1 Unidad" (Separado en json: cantidad="1", unidad_medida="Unidad")
+   - "25 Sets" (Separado en json: cantidad="25", unidad_medida="Sets")
 
-    Reglas:
-    - 1 → singular
-    - >1 → plural
-    - No inventar unidades.
+------------------------------------------------------
+5. TABLA 7 – EQUIPOS (LÓGICA MATEMÁTICA)
+------------------------------------------------------
+Calcula la "cantidad" basándote en el uso:
 
-    ------------------------------------------------------
-    5. TABLA 7 – EQUIPOS (REGLA MATEMÁTICA OBLIGATORIA)
-    ------------------------------------------------------
+Caso A: Equipo Individual (ej: PC Alumno)
+   - cantidad = TOTAL_PARTICIPANTES
+   - unidad_medida = "Unidades"
+   - num_participantes = "1"
 
-    DEFINICIONES:
-    - cantidad = total de equipos disponibles.
-    - num_participantes = personas que utilizan un mismo equipo.
-    - TOTAL_PARTICIPANTES = cupos detectados.
+Caso B: Equipo de Sala/Facilitador (ej: Proyector, PC Profesor)
+   - cantidad = "1"
+   - unidad_medida = "Unidad"
+   - num_participantes = TOTAL_PARTICIPANTES
 
-    REGLA OBLIGATORIA: debe cumplirse UNA de estas ecuaciones:
+*Antigüedad*: "Menos de 2 años" para tecnología.
+*Certificación*: Solo si el texto dice explícitamente "SEC", sino "No aplica".
 
-    1) Equipo individual por participante
-      cantidad = TOTAL_PARTICIPANTES
-      num_participantes = 1
-      La descripción debe incluir "por participante".
+------------------------------------------------------
+6. TABLA 8 – MATERIALES (LÓGICA MATEMÁTICA)
+------------------------------------------------------
 
-    2) Equipo del facilitador
-      cantidad = 1
-      num_participantes = TOTAL_PARTICIPANTES
+Caso A: Insumo Individual (ej: Cuaderno, Lápiz)
+   - cantidad = TOTAL_PARTICIPANTES
+   - unidad_medida = "Unidades"
+   - num_participantes = "1"
 
-    3) Equipo grupal compartido
-      cantidad = 1
-      num_participantes = TOTAL_PARTICIPANTES
+Caso B: Sets o Kits (ej: Estuche con útiles)
+   - cantidad = TOTAL_PARTICIPANTES
+   - unidad_medida = "Sets"
+   - num_participantes = "1"
 
-    PROHIBIDO:
-    - cantidad > 1 Y num_participantes > 1
-    - cantidad ≠ TOTAL_PARTICIPANTES si dice "por participante"
-    - num_participantes = 1 si cantidad = 1 y no dice "por participante"
+Caso C: Insumos por Paquete Compartido (ej: Resmas)
+   - cantidad = "2" (o lo que indique el texto)
+   - unidad_medida = "Resmas"
+   - num_participantes = TOTAL_PARTICIPANTES
 
-    REGLA DE PRIORIDAD SI EL PDF NO ES CLARO:
-    - Computador → tipo 1
-    - Notebook facilitador → tipo 2
-    - Proyector / Telón / Pizarrón / Cámara → tipo 3
+Caso D: Insumo Grupal Único (ej: Libro de Clases)
+   - cantidad = "1"
+   - unidad_medida = "Unidad"
+   - num_participantes = TOTAL_PARTICIPANTES
 
-    ------------------------------------------------------
-    CERTIFICACIÓN
-    ------------------------------------------------------
-    - Revisar cuidadosamente el PDF para detectar cualquier mención sobre certificación de los equipos.
-    - Si el PDF menciona que el equipo debe tener certificación, colocar "Cert. SEC" en el campo certificación.
-    - Si el PDF no menciona nada sobre certificación, volver a revisar el texto para detectar cualquier pista o mención indirecta sobre certificación, y si no se encuentra ninguna referencia clara, colocar "No aplica" en el campo certificación.
-    - No usar "Indefinida" ni dejar vacío. Si no se menciona certificación, asumir que no es un requisito y colocar "No aplica".
+------------------------------------------------------
+7. DURACIÓN
+------------------------------------------------------
+Extraer horas_totales, dias, meses. Si no aplica, usar "—".
 
+======================================================
+ESTRUCTURA JSON EXACTA
+======================================================
+Responder SOLO con este JSON válido:
 
-
-    ------------------------------------------------------
-    ANTIGÜEDAD
-    ------------------------------------------------------
-    - Para todos los equipos, si el PDF es claro al respecto, usar la antigüedad indicada.
-    - Equipos tecnológicos → "Menos de 2 años" o segun el texto si es claro.
-    - Equipos físicos → "Menos de 2 años" o segun el texto si es claro.
-    - Insumos → "No aplica" o segun el texto si es claro.
-    - Si el PDF no es claro, volver a revisar el texto para detectar pistas sobre la antigüedad de los equipos, y si no se puede inferir claramente, usar "Indefinida" para no inventar información.
-    ------------------------------------------------------
-    6. TABLA 8 – MATERIALES (REGLA MATEMÁTICA OBLIGATORIA)
-    ------------------------------------------------------
-
-    DEFINICIONES:
-    - cantidad = total de unidades disponibles.
-    - num_participantes = personas que usan UNA unidad.
-
-    REGLAS:
-
-    1) Material individual
-      cantidad = TOTAL_PARTICIPANTES
-      num_participantes = 1
-
-    2) Material grupal
-      cantidad = 1
-      num_participantes = TOTAL_PARTICIPANTES
-
-    3) Libro de clases
-      cantidad = 1
-      num_participantes = TOTAL_PARTICIPANTES
-
-    4) Plumones para pizarrón
-      cantidad = 1 Set
-      num_participantes = TOTAL_PARTICIPANTES
-
-    PROHIBIDO:
-    - cantidad > 1 Y num_participantes > 1
-    - Libro de clases con num_participantes = 1
-    - Plumones con num_participantes = 1
-
-    Si alguna regla se incumple, corregir automáticamente usando el texto o los números correspondientes del PDF como referencia.
-
-    ------------------------------------------------------
-    7. DURACIÓN
-    ------------------------------------------------------
-
-    Extraer:
-    - horas_totales
-    - dias
-    - meses
-
-    Si solo existe uno, los demás deben ser "—".
-
-    Ejemplo:
-    Si dice "Duración total: 40 horas":
-    horas_totales = 40
-    dias = "—"
-    meses = "—"
-
-    ======================================================
-    VALIDACIÓN FINAL OBLIGATORIA
-    ======================================================
-
-    Antes de responder:
-    - Verificar que ninguna fila viole las reglas matemáticas.
-    - Verificar que no existan valores vacíos.
-    - Verificar coherencia entre cantidad, num_participantes y el texto.
-    - Verificar que las unidades coincidan con singular/plural segun el número.
-
-    ======================================================
-    ESTRUCTURA JSON EXACTA
-    ======================================================
-
+{
+  "nombre_curso": "...",
+  "horas_totales": "...",
+  "dias": "...",
+  "meses": "...",
+  "lista_equipos": [
     {
-      "nombre_curso": "...",
-      "horas_totales": "...",
-      "dias": "...",
-      "meses": "...",
-      "lista_equipos": [
-        {
-          "descripcion": "...",
-          "modulo": "...",
-          "cantidad": "...",
-          "unidad_medida": "...",
-          "num_participantes": "...",
-          "antiguedad": "...",
-          "certificacion": "..."
-        }
-      ],
-      "lista_materiales": [
-        {
-          "descripcion": "...",
-          "cantidad": "...",
-          "modulo": "...",
-          "num_participantes": "..."
-          "unidad_medida": "...",
-        }
-      ],
-      "objetivo_general": "...",
-      "contenidos_resumen": "...",
-      "infraestructura_sala": "...",
-      "infraestructura_taller": "...",
-      "metodologia": "...",
-      "mecanismos_evaluacion": "..."
+      "descripcion": "...",
+      "modulo": "...",
+      "cantidad": "...", 
+      "unidad_medida": "...", 
+      "num_participantes": "...",
+      "antiguedad": "...",
+      "certificacion": "..."
     }
-
-    Responder SOLO con el JSON válido.
-    `;
-
-
-
+  ],
+  "lista_materiales": [
+    {
+      "descripcion": "...",
+      "cantidad": "...",
+      "unidad_medida": "...",
+      "modulo": "...",
+      "num_participantes": "..."
+    }
+  ],
+  "objetivo_general": "...",
+  "contenidos_resumen": "...",
+  "infraestructura_sala": "...",
+  "infraestructura_taller": "...",
+  "metodologia": "...",
+  "mecanismos_evaluacion": "..."
+}
+`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
@@ -347,13 +281,12 @@ exports.generarAnexoInteligente = async (req, res) => {
         .json({ error: "La IA respondió pero no en formato JSON válido." });
     }
 
-   
-    // --- BLOQUE DATOS FINALES OPTIMIZADO ---NUEVO
+    // --- BLOQUE DATOS FINALES OPTIMIZADO ---
     const datosFinales = {
-      // 1. Esparcimos primero lo que trajo la IA (nombre_curso, objetivo, etc.)
+      // 1. Esparcimos primero lo que trajo la IA
       ...datosExtraidos,
 
-      // 2. Datos manuales que vienen del frontend (req.body)
+      // 2. Datos manuales que vienen del frontend
       nombre_ejecutor: nombre_organismo,
       rut_ejecutor: rut_organismo,
       telefono_ejecutor: telefono_organismo,
@@ -364,40 +297,38 @@ exports.generarAnexoInteligente = async (req, res) => {
       codigo_curso: req.body.codigo_curso || "—",
 
       // 3. Aseguramos los campos de la Tabla 3 (Duración)
-      // Si el Word usa {horas}, lo mapeamos desde horas_totales
       horas: datosExtraidos.horas_totales || "—",
       dias: datosExtraidos.dias || "—",
       meses: datosExtraidos.meses || "—",
 
-
-
-      // 4. Campos de texto largo (asegurar que no sean undefined)
+      // 4. Campos de texto largo
       contenidos: datosExtraidos.contenidos_resumen || "—",
       objetivo_general: datosExtraidos.objetivo_general || "—",
       metodologia: datosExtraidos.metodologia || "—",
-      mecanismos_evaluacion: datosExtraidos.mecanismos_evaluacion || "—"
+      mecanismos_evaluacion: datosExtraidos.mecanismos_evaluacion || "—",
     };
     console.log("✅ Datos extraídos (Ejemplo):", datosExtraidos.nombre_curso);
-    
-    
+
     try {
-        await new Anexo({
-            nombrePlantilla: "plantilla_anexo2.docx",
-            datosRellenados: datosFinales,
-            fechaGeneracion: new Date(),
-            usuarioId: req.user.id, //nuevo campo para relacionar con el usuario
-        }).save();
-        
-        console.log("✅ GUARDADO EXITOSO EN BD");
-        res.setHeader("X-Anexo-Guardado", "true");
+      await new Anexo({
+        nombrePlantilla: "plantilla_anexo2.docx",
+        datosRellenados: datosFinales,
+        fechaGeneracion: new Date(),
+        usuarioId: req.user.id,
+      }).save();
+
+      console.log("✅ GUARDADO EXITOSO EN BD");
+      res.setHeader("X-Anexo-Guardado", "true");
     } catch (dbError) {
-        console.error("❌ ERROR AL GUARDAR EN BD:", dbError);
-        res.setHeader("X-Anexo-Guardado", "false"); 
+      console.error("❌ ERROR AL GUARDAR EN BD:", dbError);
+      res.setHeader("X-Anexo-Guardado", "false");
     }
-    
-    // 👇 AQUÍ ESTÁ EL CAMBIO QUE SOLUCIONA EL ERROR DEL FRONTEND 👇
-    res.setHeader("Access-Control-Expose-Headers", "X-Anexo-Guardado, Content-Disposition");
-  
+
+    // Header para el frontend
+    res.setHeader(
+      "Access-Control-Expose-Headers",
+      "X-Anexo-Guardado, Content-Disposition",
+    );
 
     // C. RELLENAR WORD
     const templatePath = path.resolve(
@@ -413,15 +344,14 @@ exports.generarAnexoInteligente = async (req, res) => {
 
     // Configuración para que los saltos de línea en el JSON se vean en el Word
     const doc = new Docxtemplater(zip, {
-        paragraphLoop: true,
-        linebreaks: true,
-        // ESTO ELIMINA LOS "UNDEFINED" DE TODO EL DOCUMENTO
-        nullGetter(part) {
-            if (!part.value) {
-                return ""; // O puedes dejarlo vacío ""
-            }
-            return part.value;
+      paragraphLoop: true,
+      linebreaks: true,
+      nullGetter(part) {
+        if (!part.value) {
+          return "";
         }
+        return part.value;
+      },
     });
 
     doc.render(datosFinales);
@@ -449,7 +379,9 @@ exports.generarAnexoInteligente = async (req, res) => {
 // 4. Get a todos los anexos
 exports.obtenerAnexos = async (req, res) => {
   try {
-    const anexos = await Anexo.find({ usuarioId: req.user.id }).sort({ createdAt: -1 });
+    const anexos = await Anexo.find({ usuarioId: req.user.id }).sort({
+      createdAt: -1,
+    });
     res.status(200).json(anexos);
   } catch (error) {
     console.error("❌ Error obteniendo anexos:", error);
@@ -486,7 +418,7 @@ exports.actualizarAnexo = async (req, res) => {
     const anexoActualizado = await Anexo.findOneAndUpdate(
       { _id: id, usuarioId: req.user.id },
       req.body,
-      { new: true }
+      { new: true },
     );
 
     if (!anexoActualizado) {
