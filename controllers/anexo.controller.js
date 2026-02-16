@@ -165,11 +165,8 @@ exports.generarAnexoInteligente = async (req, res) => {
     - Si no existe información usar "—".
 
     4. UNIDADES PERMITIDAS
-    Solo usar:
-    - Unidad / Unidades
-    - Kit / Kits
-    - Set / Sets
-    - Global
+    Usar las unidades que correspondan segun el texto del PDF, analizardo cuidadosamente cada equipo o material, y asignar la unidad correcta segun el contexto. Las unidades deben ser coherentes con el número detectado y el texto del PDF.
+
     
 
     Reglas:
@@ -214,21 +211,21 @@ exports.generarAnexoInteligente = async (req, res) => {
     ------------------------------------------------------
     CERTIFICACIÓN
     ------------------------------------------------------
+    - Revisar cuidadosamente el PDF para detectar cualquier mención sobre certificación de los equipos.
+    - Si el PDF menciona que el equipo debe tener certificación, colocar "Cert. SEC" en el campo certificación.
+    - Si el PDF no menciona nada sobre certificación, volver a revisar el texto para detectar cualquier pista o mención indirecta sobre certificación, y si no se encuentra ninguna referencia clara, colocar "No aplica" en el campo certificación.
+    - No usar "Indefinida" ni dejar vacío. Si no se menciona certificación, asumir que no es un requisito y colocar "No aplica".
 
-    - Notebook / PC / Computador / Proyector → "Cert. SEC"
-    - Telón / Pizarrón / Cámara / Filmadora → "No aplica"
 
-    No depender del texto del PDF.
-    Seguir patrón administrativo oficial.
 
     ------------------------------------------------------
     ANTIGÜEDAD
     ------------------------------------------------------
-
+    - Para todos los equipos, si el PDF es claro al respecto, usar la antigüedad indicada.
     - Equipos tecnológicos → "Menos de 2 años" o segun el texto si es claro.
     - Equipos físicos → "Menos de 2 años" o segun el texto si es claro.
     - Insumos → "No aplica" o segun el texto si es claro.
-
+    - Si el PDF no es claro, volver a revisar el texto para detectar pistas sobre la antigüedad de los equipos, y si no se puede inferir claramente, usar "Indefinida" para no inventar información.
     ------------------------------------------------------
     6. TABLA 8 – MATERIALES (REGLA MATEMÁTICA OBLIGATORIA)
     ------------------------------------------------------
