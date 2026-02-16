@@ -192,8 +192,8 @@ Caso B: Equipo de Sala/Facilitador (ej: Proyector, PC Profesor)
    - unidad_medida = "Unidad"
    - num_participantes = TOTAL_PARTICIPANTES
 
-*Antigüedad*: "Menos de 2 años" para tecnología.
-*Certificación*: Solo si el texto dice explícitamente "SEC", sino "No aplica".
+*Antigüedad*: "Menos de 2 años" para tecnología (salvo que el texto indique otra cosa) o "indefinida" segun el caso.   
+*Certificación*: Solo si el texto dice explícitamente "SEC", sino volver a revisar detalladamente el texto para detectar si hay alguna certificación mencionada. Si no hay nada, usar "No aplica".
 
 ------------------------------------------------------
 6. TABLA 8 – MATERIALES (LÓGICA MATEMÁTICA)
